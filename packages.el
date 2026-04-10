@@ -54,3 +54,4 @@
 ;; (unpin! t)
 
 (package! nerd-icons)
+(package! org-roam)
