@@ -14,7 +14,7 @@
 ;; KONSTANTER
 ;; ==========================================
 
-(defconst albin-dashboard-right-col 57
+(defconst albin-dashboard-right-col 63
   "Screen column where right-column content starts.")
 
 (defconst albin-dashboard-bar-max-width 8
@@ -22,6 +22,12 @@
 
 (defconst albin-dashboard-agenda-days 3
   "Number of days to show in the agenda widget (today + N-1 upcoming days).")
+
+(defconst albin-dashboard-left-width 58
+  "Suggested visual width for the left dashboard column.")
+
+(defconst albin-dashboard-min-gap 4
+  "Minimum spacing between left and right columns.")
 
 ;; ==========================================
 ;; 1. KEYMAP AND MODE
@@ -85,17 +91,16 @@
 (albin/dashboard-fetch-weather)
 
 (defvar albin-dashboard-quotes
-  '("Emacs is a great operating system, lacking only a decent editor."
-    "Tip: 'C-x 1' closes all windows except the active one."
-    "Tip: Use 'C-x r t' (string-rectangle) to type on multiple lines at once."
-    "Tip: 'C-s' searches forward. Press 'C-s' again to jump to the next match."
-    "Tip: 'M-/' (dabbrev-expand) is your best friend for auto-completion."
-    "Tip: 'C-x u' (or 'C-/') to undo."
-    "Real programmers use M-x butterfly."
-    "Tip: 'C-h v' lets you search and read about all variables in Emacs."
-    "Tip: 'M-q' fills the paragraph so line breaks look neat."
-    "I use Emacs, which might be thought of as a thermonuclear word processor."
-    "Tip: Select text and press 'M-w' to copy, 'C-y' to paste.")
+  '("Welcome home. Everything is a buffer."
+    "M-x is not a command. It is a lifestyle."
+    "C-h k shows what a key does."
+    "C-h f explains any function."
+    "C-h v explains any variable."
+    "C-x b is often faster than mouse navigation."
+    "M-/ expands words from open buffers."
+    "C-x 1 focuses the current window."
+    "Org is your planner. Roam is your map."
+    "Keep notes small. Links make them powerful.")
   "A list of nerd quotes and Emacs tips.")
 
 ;; ==========================================
@@ -103,21 +108,30 @@
 ;; ==========================================
 
 (defun albin/dashboard-sep ()
-  "Insert a Unicode horizontal separator for the left column."
-  (insert (propertize "  ─────────────────────────────────────────────────\n"
+  "Insert a horizontal separator for the left column."
+  (insert (propertize "  -----------------------------------------------------\n"
                       'face 'font-lock-comment-face)))
 
 (defun albin/dashboard-section-header (icon title)
   "Insert a styled section header with ICON and TITLE."
   (insert (propertize (format " %s %s\n" icon title)
-                      'face '(:inherit font-lock-type-face :weight bold)))
+                      'face '(:inherit font-lock-keyword-face :weight bold)))
   (albin/dashboard-sep))
+
+(defun albin/dashboard-right-column-start ()
+  "Return an adaptive start column for the right-hand widgets."
+  (min (max albin-dashboard-right-col
+            (+ albin-dashboard-left-width albin-dashboard-min-gap))
+       (- (window-width) 32)))
 
 (defun albin/dashboard-insert-button-inline (label func &optional face)
   "Insert a clickable button inline (no leading spaces or trailing newline)."
   (insert-text-button
    (concat "[ " label " ]")
-   'action (lambda (_) (call-interactively func) (albin/dashboard))
+   'action (lambda (_)
+             (cond ((commandp func) (call-interactively func))
+                   ((functionp func) (funcall func)))
+             (albin/dashboard))
    'follow-link t
    'face (or face 'font-lock-function-name-face)))
 
@@ -126,24 +140,94 @@
 ;; ==========================================
 
 (defun albin/dashboard-insert-banner ()
-  "Insert the ASCII art banner."
+  "Insert an Emacs-style startup banner."
   (let ((banner "
-      ___   __    ___  _____  _  _  
-     / _ \\ (  )  (  _)(  _  )( \\( )
-    ( (_) ) )(__  ) _( )(_)(  )  (  
-     \\___/ (____)(___)(_____)(_)\\_)
-          E M A C S   S E T U P
+   _____                          
+  | ____|_ __ ___   __ _  ___ ___ 
+  |  _| | '_ ` _ \\ / _` |/ __/ __|
+  | |___| | | | | | (_| | (__\\__ \\
+  |_____|_| |_| |_|\\__,_|\\___|___/
 "))
     (insert (propertize banner 'face 'font-lock-keyword-face))
+    (insert (propertize "  GNU's Not Unix. Lisp all the way down.\n"
+                        'face 'font-lock-doc-face))
     (insert "\n")))
 
 (defun albin/dashboard-insert-quote ()
-  "Insert a random Emacs tip or quote."
+  "Insert a random Emacs tip."
   (let* ((idx (random (length albin-dashboard-quotes)))
          (q (nth idx albin-dashboard-quotes)))
     (insert "  ")
-    (insert (propertize (format "“%s”" q) 'face 'font-lock-doc-face))
+    (insert (propertize (format "Tip of the moment: %s" q) 'face 'font-lock-doc-face))
     (insert "\n\n")))
+
+(defun albin/dashboard-insert-startup-widget ()
+  "Insert startup/session information with an Emacs flavor."
+  (albin/dashboard-section-header (nerd-icons-mdicon "nf-md-rocket_launch") "SESSION")
+  (let* ((pkg-count (if (boundp 'package-activated-list)
+                        (length package-activated-list)
+                      0))
+         (buffers (length (buffer-list))))
+    (insert (format "  %-18s %s\n" "Today:" (format-time-string "%A, %d %B %Y")))
+    (insert (format "  %-18s %s\n" "Current time:" (format-time-string "%H:%M")))
+    (insert (format "  %-18s %s\n" "Init time:" (emacs-init-time)))
+    (insert (format "  %-18s %d\n" "Open buffers:" buffers))
+    (insert (format "  %-18s %d\n" "Packages active:" pkg-count))
+    (insert (format "  %-18s %d\n" "GC cycles:" gcs-done))
+    (insert "\n")))
+
+(defun albin/dashboard-insert-roam-widget ()
+  "Insert a compact org-roam summary."
+  (albin/dashboard-section-header (nerd-icons-mdicon "nf-md-graph") "ORG + ROAM")
+  (let* ((roam-ready (and (boundp 'org-roam-directory) org-roam-directory))
+         (roam-dir (when roam-ready (expand-file-name org-roam-directory)))
+         (org-files (if (and roam-dir (file-directory-p roam-dir))
+                        (directory-files-recursively roam-dir "\\.org$")
+                      '()))
+         (daily-file (if roam-dir
+                         (expand-file-name (format-time-string "%Y-%m-%d.org")
+                                           (expand-file-name "daily" roam-dir))
+                       nil)))
+    (insert (format "  %-18s %s\n"
+                    "Org directory:"
+                    (if roam-ready (abbreviate-file-name roam-dir) "Not configured")))
+    (insert (format "  %-18s %s\n"
+                    "Org files:"
+                    (if roam-ready (number-to-string (length org-files)) "0")))
+    (insert (format "  %-18s %s\n"
+                    "Daily note:"
+                    (if (and daily-file (file-exists-p daily-file))
+                        (propertize "Present" 'face 'success)
+                      (propertize "Not created" 'face 'warning))))
+    (insert (format "  %-18s %s\n"
+                    "Weather:"
+                    (propertize albin-dashboard-weather-string 'face 'font-lock-string-face)))
+    (insert "\n")))
+
+(defun albin/dashboard-insert-jump-widget ()
+  "Insert quick-jump links to frequently edited config files."
+  (albin/dashboard-section-header (nerd-icons-octicon "nf-oct-file_code") "JUMP")
+  (insert "  ")
+  (albin/dashboard-insert-button-inline
+   "config.el"
+   (lambda () (find-file (expand-file-name "config.el" doom-user-dir)))
+   'font-lock-constant-face)
+  (insert "  ")
+  (albin/dashboard-insert-button-inline
+   "init.el"
+   (lambda () (find-file (expand-file-name "init.el" doom-user-dir)))
+   'font-lock-constant-face)
+  (insert "  ")
+  (albin/dashboard-insert-button-inline
+   "packages.el"
+   (lambda () (find-file (expand-file-name "packages.el" doom-user-dir)))
+   'font-lock-constant-face)
+  (insert "\n  ")
+  (albin/dashboard-insert-button-inline
+   "dashboard.el"
+   (lambda () (find-file (expand-file-name "lisp/albin-dashboard.el" doom-user-dir)))
+   'font-lock-constant-face)
+  (insert "\n\n"))
 
 (defun albin/dashboard-insert-timeclock-widget ()
   "Insert the time tracking status widget."
@@ -248,7 +332,7 @@ The number of days shown is controlled by `albin-dashboard-agenda-days'."
 
 (defun albin/dashboard-insert-projects ()
   "Insert known project list."
-  (albin/dashboard-section-header (nerd-icons-faicon "nf-fa-rocket") "PROJECTS")
+  (albin/dashboard-section-header (nerd-icons-faicon "nf-fa-folder_open") "PROJECTS")
   (let ((projs (when (boundp 'project-known-project-roots) project-known-project-roots)))
     (if projs
         (dolist (proj (seq-take projs 5))
@@ -260,12 +344,12 @@ The number of days shown is controlled by `albin-dashboard-agenda-days'."
              'follow-link t
              'face 'font-lock-constant-face)
             (insert "\n")))
-      (insert "  No projects found in project.el yet.\n")))
+        (insert "  No projects tracked yet. Visit one and it will show up here.\n")))
   (insert "\n"))
 
 (defun albin/dashboard-insert-recentf ()
   "Insert recently opened files."
-  (albin/dashboard-section-header (nerd-icons-faicon "nf-fa-folder") "RECENT FILES")
+  (albin/dashboard-section-header (nerd-icons-faicon "nf-fa-file_text_o") "RECENT FILES")
   (if recentf-list
       (dolist (file (seq-take recentf-list 5))
         (let ((f file))
@@ -282,45 +366,49 @@ The number of days shown is controlled by `albin-dashboard-agenda-days'."
   (insert "\n"))
 
 (defun albin/dashboard-insert-quick-commands ()
-  "Insert quick-command buttons in compact multi-column rows."
-  (albin/dashboard-section-header (nerd-icons-faicon "nf-fa-bolt") "QUICK COMMANDS")
-  ;; Row 1: clock operations
+  "Insert command center buttons in an Emacs-centric layout."
+  (albin/dashboard-section-header (nerd-icons-mdicon "nf-md-keyboard") "COMMAND CENTER")
+  ;; Row 1: core Emacs
   (insert "  ")
+  (albin/dashboard-insert-button-inline "M-x" 'execute-extended-command 'font-lock-keyword-face)
+  (insert "  ")
+  (albin/dashboard-insert-button-inline "Find file" 'find-file 'font-lock-keyword-face)
+  (insert "  ")
+  (albin/dashboard-insert-button-inline "Switch buffer" 'switch-to-buffer 'font-lock-keyword-face)
+  (insert "\n  ")
+  ;; Row 2: org/notes
+  (albin/dashboard-insert-button-inline "Capture (c)" 'org-capture 'font-lock-doc-face)
+  (insert "  ")
+  (albin/dashboard-insert-button-inline "Agenda" 'org-agenda 'font-lock-doc-face)
+  (insert "  ")
+  (when (fboundp 'org-roam-node-find)
+    (albin/dashboard-insert-button-inline "Roam find" 'org-roam-node-find 'font-lock-doc-face))
+  (insert "\n  ")
+  ;; Row 3: timeclock
   (albin/dashboard-insert-button-inline "IN (i)" 'albin/timeclock-in 'success)
   (insert "  ")
-  (albin/dashboard-insert-button-inline "UT (o)" 'albin/timeclock-out 'error)
+  (albin/dashboard-insert-button-inline "OUT (o)" 'albin/timeclock-out 'error)
   (insert "  ")
   (albin/dashboard-insert-button-inline "Break (b)" 'albin/timeclock-break 'warning)
   (insert "  ")
   (albin/dashboard-insert-button-inline "Resume (r)" 'albin/timeclock-resume)
-  (insert "\n  ")
-  ;; Row 2: project / profile operations
-  (albin/dashboard-insert-button-inline "Profile (p)" 'albin/timeclock-switch-profile)
-  (insert "  ")
-  (albin/dashboard-insert-button-inline "Switch project (C)" 'albin/timeclock-change 'font-lock-string-face)
-  (insert "  ")
-  (albin/dashboard-insert-button-inline "Project (P)" 'albin/timeclock-edit-project 'font-lock-string-face)
-  (insert "\n  ")
-  ;; Row 3: reporting
-  (albin/dashboard-insert-button-inline "Export CSV (e)" 'albin/timeclock-export-csv 'font-lock-doc-face)
-  (insert "  ")
-  (albin/dashboard-insert-button-inline "Week (s)" 'albin/timeclock-weekly-summary 'font-lock-doc-face)
-  (insert "  ")
-  (albin/dashboard-insert-button-inline "Diary (d)" 'albin/timeclock-open-diary 'font-lock-doc-face)
   (insert "\n\n"))
 
 (defun albin/dashboard-insert-tips ()
-  "Insert a compact keybinding reference line."
+  "Insert compact key hints."
+  (albin/dashboard-section-header (nerd-icons-codicon "nf-cod-terminal_cmd") "KEY HINTS")
   (insert "  ")
-  (insert (propertize
-           "i=in  o=out  b=break  r=resume  C=switch  p=profile  P=project  e=csv  s=week  d=diary  c=capture  g=refresh  q=close"
-           'face 'font-lock-comment-face))
-  (insert "\n"))
+  (insert (propertize "C-h k  describe key   |   C-h f  describe function   |   M-x  command palette"
+                      'face 'font-lock-comment-face))
+  (insert "\n  ")
+  (insert (propertize "i=in  o=out  b=break  r=resume  p=profile  C=switch  e=csv  s=week  d=diary  g=refresh  q=quit"
+                      'face 'font-lock-comment-face))
+  (insert "\n\n"))
 
 (defun albin/dashboard-insert-footer ()
-  "Insert the footer with Emacs load time."
+  "Insert footer with a startup-style message." 
   (insert "  ")
-  (insert (propertize (format "Nerd fact: Emacs loaded a bunch of packages in %s" (emacs-init-time))
+  (insert (propertize "Ready. Press g to refresh, q to close, or SPC n for your notes flow."
                       'face 'font-lock-comment-face))
   (insert "\n\n"))
 
@@ -436,7 +524,7 @@ The number of days shown is controlled by `albin-dashboard-agenda-days'."
     (reverse lines)))
 
 (defun albin/dashboard-get-right-column ()
-  "Combine month logs and weekly report into a single right-column line list."
+  "Combine right-column widgets into one line list."
   (append (albin/dashboard-get-month-logs)
           (list "" "")
           (albin/dashboard-get-weekly-report)))
@@ -475,25 +563,28 @@ The number of days shown is controlled by `albin-dashboard-agenda-days'."
         (let ((dual-start (point-marker)))
 
           ;; LEFT COLUMN
+          (albin/dashboard-insert-startup-widget)
+          (albin/dashboard-insert-roam-widget)
+          (albin/dashboard-insert-jump-widget)
           (albin/dashboard-insert-timeclock-widget)
           (albin/dashboard-insert-agenda)
+          (albin/dashboard-insert-quick-commands)
           (albin/dashboard-insert-projects)
           (albin/dashboard-insert-recentf)
-          (albin/dashboard-insert-quick-commands)
           (albin/dashboard-insert-tips)
-          (insert "\n")
           (albin/dashboard-insert-footer)
 
           ;; RIGHT COLUMN: walk back to dual-start and append content line-by-line
           (let ((right-lines (albin/dashboard-get-right-column)))
+            (let ((right-col (albin/dashboard-right-column-start)))
             (goto-char dual-start)
             (dolist (r-line right-lines)
               (end-of-line)
               (delete-trailing-whitespace (line-beginning-position) (line-end-position))
-              (insert (propertize " " 'display `(space :align-to ,albin-dashboard-right-col)))
+              (insert (propertize " " 'display `(space :align-to ,right-col)))
               (insert r-line)
               (when (= (forward-line 1) 1)
-                (insert "\n"))))))
+                (insert "\n")))))))
 
       (if old-point
           (goto-char old-point)
