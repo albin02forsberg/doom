@@ -29,6 +29,9 @@
 (defconst albin-dashboard-min-gap 4
   "Minimum spacing between left and right columns.")
 
+(defvar albin-dashboard--render-window nil
+  "Window used to compute dashboard layout during rendering.")
+
 ;; ==========================================
 ;; 1. KEYMAP AND MODE
 ;; ==========================================
@@ -58,9 +61,24 @@
   (when (bound-and-true-p display-line-numbers-mode)
     (display-line-numbers-mode -1)))
 
-(when (bound-and-true-p evil-mode)
+(with-eval-after-load 'evil
   ;; Motion state keeps the buffer read-only while allowing Doom leader keys.
-  (evil-set-initial-state 'albin-dashboard-mode 'motion))
+  (evil-set-initial-state 'albin-dashboard-mode 'motion)
+  ;; Ensure one-key dashboard shortcuts work in Evil states too.
+  (evil-define-key '(motion normal) albin-dashboard-mode-map
+    (kbd "i") #'albin/timeclock-in
+    (kbd "o") #'albin/timeclock-out
+    (kbd "b") #'albin/timeclock-break
+    (kbd "r") #'albin/timeclock-resume
+    (kbd "C") #'albin/timeclock-change
+    (kbd "p") #'albin/timeclock-switch-profile
+    (kbd "P") #'albin/timeclock-edit-project
+    (kbd "e") #'albin/timeclock-export-csv
+    (kbd "s") #'albin/timeclock-weekly-summary
+    (kbd "d") #'albin/timeclock-open-diary
+    (kbd "c") #'org-capture
+    (kbd "g") #'albin/dashboard
+    (kbd "q") #'quit-window))
 
 ;; ==========================================
 ;; 2. WEATHER AND QUOTES
@@ -120,9 +138,21 @@
 
 (defun albin/dashboard-right-column-start ()
   "Return an adaptive start column for the right-hand widgets."
-  (min (max albin-dashboard-right-col
-            (+ albin-dashboard-left-width albin-dashboard-min-gap))
-       (- (window-width) 32)))
+  (let* ((win (if (window-live-p albin-dashboard--render-window)
+                  albin-dashboard--render-window
+                (selected-window)))
+         (width (window-body-width win))
+         (target (max albin-dashboard-right-col
+                      (+ albin-dashboard-left-width albin-dashboard-min-gap))))
+    (min target (- width 32))))
+
+(defun albin/dashboard-progress-bar (ratio width)
+  "Return a simple text progress bar from RATIO with total WIDTH.
+RATIO is clamped to [0,1]."
+  (let* ((clamped (max 0.0 (min 1.0 ratio)))
+         (filled (round (* clamped width)))
+         (empty (max 0 (- width filled))))
+    (concat (make-string filled ?#) (make-string empty ?.))))
 
 (defun albin/dashboard-insert-button-inline (label func &optional face)
   "Insert a clickable button inline (no leading spaces or trailing newline)."
@@ -167,10 +197,17 @@
   (let* ((pkg-count (if (boundp 'package-activated-list)
                         (length package-activated-list)
                       0))
-         (buffers (length (buffer-list))))
+         (buffers (length (buffer-list)))
+         (hour (string-to-number (format-time-string "%H")))
+         (min (string-to-number (format-time-string "%M")))
+         (day-ratio (/ (+ (* hour 60.0) min) (* 24.0 60.0))))
     (insert (format "  %-18s %s\n" "Today:" (format-time-string "%A, %d %B %Y")))
     (insert (format "  %-18s %s\n" "Current time:" (format-time-string "%H:%M")))
     (insert (format "  %-18s %s\n" "Init time:" (emacs-init-time)))
+    (insert (format "  %-18s [%s] %d%%\n"
+                    "Day progress:"
+                    (albin/dashboard-progress-bar day-ratio 18)
+                    (round (* day-ratio 100))))
     (insert (format "  %-18s %d\n" "Open buffers:" buffers))
     (insert (format "  %-18s %d\n" "Packages active:" pkg-count))
     (insert (format "  %-18s %d\n" "GC cycles:" gcs-done))
@@ -250,9 +287,10 @@
       (let ((date (nth 0 s)) (hrs (nth 3 s)))
         (puthash date (+ (gethash date daily-hours 0.0) hrs) daily-hours)))
 
-    (let* ((logged-today (gethash today-str daily-hours 0.0))
+        (let* ((logged-today (gethash today-str daily-hours 0.0))
            ;; Include the currently open session in today's running total
-           (today-hours (+ logged-today elapsed-hours)))
+          (today-hours (+ logged-today elapsed-hours))
+          (to-target (max 0.0 (- 8.0 today-hours))))
       (insert (format "  %-16s %s\n" "Current profile:"
                       (propertize albin-timeclock-current-profile 'face 'font-lock-string-face)))
       (insert (format "  %-16s %s\n" "Total Flex:"
@@ -266,7 +304,12 @@
                                       'face 'success)
                         (propertize "○ Clocked out / On break" 'face 'warning))))
       (insert (format "  %-16s %s\n" "Today:"
-                      (propertize (format "%.2f h" today-hours) 'face 'font-lock-constant-face))))
+                      (propertize (format "%.2f h" today-hours) 'face 'font-lock-constant-face)))
+      (insert (format "  %-16s %s\n"
+                      "To 8h target:"
+                      (if (> to-target 0.0)
+                          (propertize (format "%.2f h left" to-target) 'face 'warning)
+                        (propertize "Target met" 'face 'success)))))
 
     ;; 7-day mini bar chart with labeled day-of-week row
     (let* ((today (current-time))
@@ -383,6 +426,9 @@ The number of days shown is controlled by `albin-dashboard-agenda-days'."
   (insert "  ")
   (when (fboundp 'org-roam-node-find)
     (albin/dashboard-insert-button-inline "Roam find" 'org-roam-node-find 'font-lock-doc-face))
+  (insert "  ")
+  (when (fboundp 'org-roam-dailies-capture-today)
+    (albin/dashboard-insert-button-inline "Daily" 'org-roam-dailies-capture-today 'font-lock-doc-face))
   (insert "\n  ")
   ;; Row 3: timeclock
   (albin/dashboard-insert-button-inline "IN (i)" 'albin/timeclock-in 'success)
@@ -392,7 +438,33 @@ The number of days shown is controlled by `albin-dashboard-agenda-days'."
   (albin/dashboard-insert-button-inline "Break (b)" 'albin/timeclock-break 'warning)
   (insert "  ")
   (albin/dashboard-insert-button-inline "Resume (r)" 'albin/timeclock-resume)
+  (insert "\n  ")
+  ;; Row 4: dashboard flow
+  (albin/dashboard-insert-button-inline "Refresh (g)" 'albin/dashboard 'font-lock-comment-face)
+  (insert "  ")
+  (albin/dashboard-insert-button-inline "Quit (q)" 'quit-window 'font-lock-comment-face)
   (insert "\n\n"))
+
+(defun albin/dashboard-insert-focus-widget ()
+  "Insert today's priority slice from org agenda entries."
+  (albin/dashboard-section-header (nerd-icons-mdicon "nf-md-crosshairs_gps") "TODAY'S FOCUS")
+  (let* ((decoded (decode-time (current-time)))
+         (date (list (nth 4 decoded) (nth 3 decoded) (nth 5 decoded)))
+         (entries (when org-agenda-files
+                    (apply #'append
+                           (mapcar (lambda (file)
+                                     (condition-case nil
+                                         (org-agenda-get-day-entries file date :scheduled :deadline :timestamp)
+                                       (error nil)))
+                                   (org-agenda-files)))))
+         (items (seq-take entries 3)))
+    (if (not items)
+        (insert "  No urgent agenda entries for today. Capture one and make momentum.\n\n")
+      (insert "  Next actions:\n")
+      (dolist (entry items)
+        (let ((txt (string-trim (or (get-text-property 0 'txt entry) ""))))
+          (insert (format "  -> %s\n" txt))))
+      (insert "\n"))))
 
 (defun albin/dashboard-insert-tips ()
   "Insert compact key hints."
@@ -538,10 +610,15 @@ The number of days shown is controlled by `albin-dashboard-agenda-days'."
   (interactive)
   (let* ((buf-name "*Albin Dashboard*")
          (buf (get-buffer-create buf-name))
+         ;; Render against the actual dashboard window to avoid first-draw misalignment.
+         (render-win (or (get-buffer-window buf t)
+                         (and (not silent)
+                              (display-buffer buf '(display-buffer-same-window)))))
          (old-point (when (get-buffer buf-name)
                       (with-current-buffer buf-name (point)))))
 
     (with-current-buffer buf
+      (let ((albin-dashboard--render-window (or render-win (selected-window))))
       (albin-dashboard-mode)
       (let ((inhibit-read-only t))
         (erase-buffer)
@@ -568,6 +645,7 @@ The number of days shown is controlled by `albin-dashboard-agenda-days'."
           (albin/dashboard-insert-jump-widget)
           (albin/dashboard-insert-timeclock-widget)
           (albin/dashboard-insert-agenda)
+          (albin/dashboard-insert-focus-widget)
           (albin/dashboard-insert-quick-commands)
           (albin/dashboard-insert-projects)
           (albin/dashboard-insert-recentf)
@@ -577,21 +655,21 @@ The number of days shown is controlled by `albin-dashboard-agenda-days'."
           ;; RIGHT COLUMN: walk back to dual-start and append content line-by-line
           (let ((right-lines (albin/dashboard-get-right-column)))
             (let ((right-col (albin/dashboard-right-column-start)))
-            (goto-char dual-start)
-            (dolist (r-line right-lines)
-              (end-of-line)
-              (delete-trailing-whitespace (line-beginning-position) (line-end-position))
-              (insert (propertize " " 'display `(space :align-to ,right-col)))
-              (insert r-line)
-              (when (= (forward-line 1) 1)
-                (insert "\n")))))))
+              (goto-char dual-start)
+              (dolist (r-line right-lines)
+                (end-of-line)
+                (delete-trailing-whitespace (line-beginning-position) (line-end-position))
+                (insert (propertize " " 'display `(space :align-to ,right-col)))
+                (insert r-line)
+                (when (= (forward-line 1) 1)
+                  (insert "\n")))))))
 
       (if old-point
           (goto-char old-point)
         (goto-char (point-min)))
 
       ;; Prevent Emacs from asking to save this buffer on exit
-      (set-buffer-modified-p nil))
+      (set-buffer-modified-p nil)))
 
     (unless silent
       (switch-to-buffer buf))))

@@ -45,35 +45,35 @@
 
 ;; Make which-key appear faster after pressing leader keys.
 (after! which-key
-	(setq which-key-idle-delay 0.2
-				which-key-idle-secondary-delay 0.05))
+  (setq which-key-idle-delay 0.2
+	which-key-idle-secondary-delay 0.05))
 
-;; Show Albin timeclock status directly in Doom modeline.
-(after! doom-modeline
-	(doom-modeline-def-segment albin-timeclock
-		(when (and (boundp 'albin-timeclock-mode-string)
-							 (stringp albin-timeclock-mode-string)
-							 (not (string-empty-p (string-trim albin-timeclock-mode-string))))
-			(concat (doom-modeline-spc)
-							(propertize albin-timeclock-mode-string
-													'face (doom-modeline-face 'doom-modeline-info)))))
+;; ;; Show Albin timeclock status directly in Doom modeline.
+;; (after! doom-modeline
+;; 	(doom-modeline-def-segment albin-timeclock
+;; 		(when (and (boundp 'albin-timeclock-mode-string)
+;; 							 (stringp albin-timeclock-mode-string)
+;; 							 (not (string-empty-p (string-trim albin-timeclock-mode-string))))
+;; 			(concat (doom-modeline-spc)
+;; 							(propertize albin-timeclock-mode-string
+;; 													'face (doom-modeline-face 'doom-modeline-info)))))
 
-	;; Add timeclock segment to frequently used modelines.
-	(doom-modeline-def-modeline 'main
-		'(eldoc bar window-state workspace-name window-number modals matches follow buffer-info remote-host buffer-position word-count parrot selection-info)
-		'(compilation objed-state misc-info project-name persp-name battery grip irc mu4e gnus github debug repl lsp minor-modes input-method indent-info buffer-encoding major-mode process vcs check albin-timeclock time))
+;; 	;; Add timeclock segment to frequently used modelines.
+;; 	(doom-modeline-def-modeline 'main
+;; 		'(eldoc bar window-state workspace-name window-number modals matches follow buffer-info remote-host buffer-position word-count parrot selection-info)
+;; 		'(compilation objed-state misc-info project-name persp-name battery grip irc mu4e gnus github debug repl lsp minor-modes input-method indent-info buffer-encoding major-mode process vcs check albin-timeclock time))
 
-	(doom-modeline-def-modeline 'dashboard
-		'(bar window-number modals buffer-default-directory-simple remote-host)
-		'(compilation misc-info battery irc mu4e gnus github debug minor-modes input-method major-mode process albin-timeclock time))
+;; 	(doom-modeline-def-modeline 'dashboard
+;; 		'(bar window-number modals buffer-default-directory-simple remote-host)
+;; 		'(compilation misc-info battery irc mu4e gnus github debug minor-modes input-method major-mode process albin-timeclock time))
 
-	(doom-modeline-def-modeline 'vcs
-		'(bar window-state window-number modals matches buffer-info remote-host buffer-position parrot selection-info)
-		'(compilation misc-info battery irc mu4e gnus github debug minor-modes buffer-encoding major-mode process albin-timeclock time))
+;; 	(doom-modeline-def-modeline 'vcs
+;; 		'(bar window-state window-number modals matches buffer-info remote-host buffer-position parrot selection-info)
+;; 		'(compilation misc-info battery irc mu4e gnus github debug minor-modes buffer-encoding major-mode process albin-timeclock time))
 
-	(doom-modeline-def-modeline 'special
-		'(eldoc bar window-state window-number modals matches buffer-info remote-host buffer-position word-count parrot selection-info)
-		'(compilation objed-state misc-info battery irc-buffers debug minor-modes input-method indent-info buffer-encoding major-mode process albin-timeclock time)))
+;; 	(doom-modeline-def-modeline 'special
+;; 		'(eldoc bar window-state window-number modals matches buffer-info remote-host buffer-position word-count parrot selection-info)
+;; 		'(compilation objed-state misc-info battery irc-buffers debug minor-modes input-method indent-info buffer-encoding major-mode process albin-timeclock time)))
 
 ;; If you use `org' and don't want your org files in the default location below,
 ;; change `org-directory'. It must be set before org loads!
@@ -83,43 +83,43 @@
 (use-package! org-roam
   :init
   (setq org-roam-v2-ack t
-	  ;; Use the main org directory as the roam vault.
-	  org-roam-directory (expand-file-name org-directory))
+	;; Use the main org directory as the roam vault.
+	org-roam-directory (expand-file-name org-directory))
   :config
   (make-directory org-roam-directory t)
   (org-roam-db-autosync-mode 1)
   (map! :leader
-	  (:prefix ("n" . "notes")
-	   :desc "Agenda" "a" #'org-agenda
-	   :desc "Capture" "c" #'org-capture
-	   :desc "Today (daily)" "d" #'org-roam-dailies-goto-today
-	   :desc "Find node" "f" #'org-roam-node-find
-	   :desc "Insert node" "i" #'org-roam-node-insert
-	   :desc "Toggle roam buffer" "l" #'org-roam-buffer-toggle
-	   :desc "Tomorrow (daily)" "m" #'org-roam-dailies-goto-tomorrow
-	   :desc "Find node" "n" #'org-roam-node-find
-	   :desc "Capture node" "r" #'org-roam-capture
-	   :desc "Sync roam DB" "s" #'org-roam-db-sync
-	   :desc "Capture today" "t" #'org-roam-dailies-capture-today
-	   :desc "Random node" "x" #'org-roam-node-random
-	   :desc "Yesterday (daily)" "y" #'org-roam-dailies-goto-yesterday
-	   (:prefix ("R" . "roam-extra")
-	    :desc "Add alias" "a" #'org-roam-alias-add
-	    :desc "Add tag" "t" #'org-roam-tag-add))))
+	(:prefix ("n" . "notes")
+	 :desc "Agenda" "a" #'org-agenda
+	 :desc "Capture" "c" #'org-capture
+	 :desc "Today (daily)" "d" #'org-roam-dailies-goto-today
+	 :desc "Find node" "f" #'org-roam-node-find
+	 :desc "Insert node" "i" #'org-roam-node-insert
+	 :desc "Toggle roam buffer" "l" #'org-roam-buffer-toggle
+	 :desc "Tomorrow (daily)" "m" #'org-roam-dailies-goto-tomorrow
+	 :desc "Find node" "n" #'org-roam-node-find
+	 :desc "Capture node" "r" #'org-roam-capture
+	 :desc "Sync roam DB" "s" #'org-roam-db-sync
+	 :desc "Capture today" "t" #'org-roam-dailies-capture-today
+	 :desc "Random node" "x" #'org-roam-node-random
+	 :desc "Yesterday (daily)" "y" #'org-roam-dailies-goto-yesterday
+	 (:prefix ("R" . "roam-extra")
+	  :desc "Add alias" "a" #'org-roam-alias-add
+	  :desc "Add tag" "t" #'org-roam-tag-add))))
 
 ;; Make Org workflows (agenda/capture/notes) roam-first.
 (after! org
   (setq org-default-notes-file (expand-file-name "inbox.org" org-roam-directory)
-	  org-agenda-files (list org-roam-directory)
-	  org-agenda-file-regexp "\\`[^.].*\\.org\\'")
+	org-agenda-files (list org-roam-directory)
+	org-agenda-file-regexp "\\`[^.].*\\.org\\'")
 
   (setq org-capture-templates
-	  '(("t" "Todo" entry
-	     (file+headline org-default-notes-file "Tasks")
-	     "* TODO %?\n%U\n")
-	    ("n" "Note" entry
-	     (file+headline org-default-notes-file "Notes")
-	     "* %?\n%U\n"))))
+	'(("t" "Todo" entry
+	   (file+headline org-default-notes-file "Tasks")
+	   "* TODO %?\n%U\n")
+	  ("n" "Note" entry
+	   (file+headline org-default-notes-file "Notes")
+	   "* %?\n%U\n"))))
 
 ;; Force .tsx to web-mode to avoid tree-sitter grammar issues.
 (add-to-list 'auto-mode-alist '("\\.tsx\\'" . web-mode))
@@ -139,12 +139,12 @@
 
 ;; Auto-start Eglot for programming buffers.
 (after! eglot
-	;; Ensure TS/TSX major modes use the TypeScript language server.
-	(add-to-list 'eglot-server-programs
-							 '((typescript-mode typescript-ts-mode typescript-tsx-mode
-									tsx-ts-mode js-mode js-ts-mode js2-mode rjsx-mode web-mode)
-								 . ("typescript-language-server" "--stdio")))
-	)
+  ;; Ensure TS/TSX major modes use the TypeScript language server.
+  (add-to-list 'eglot-server-programs
+	       '((typescript-mode typescript-ts-mode typescript-tsx-mode
+		  tsx-ts-mode js-mode js-ts-mode js2-mode rjsx-mode web-mode)
+		 . ("typescript-language-server" "--stdio")))
+  )
 
 
 ;; Whenever you reconfigure a package, make sure to wrap your config in an
@@ -193,10 +193,10 @@
 (add-hook 'emacs-startup-hook #'albin/dashboard)
 
 (defun albin/use-dashboard-overrides-h ()
-	"Ensure Doom dashboard commands open Albin dashboard."
-	(when (and (fboundp '+dashboard/open)
-						 (not (advice-member-p #'albin/dashboard-open-for-doom #'+dashboard/open)))
-		(advice-add #'+dashboard/open :override #'albin/dashboard-open-for-doom)))
+  "Ensure Doom dashboard commands open Albin dashboard."
+  (when (and (fboundp '+dashboard/open)
+	     (not (advice-member-p #'albin/dashboard-open-for-doom #'+dashboard/open)))
+    (advice-add #'+dashboard/open :override #'albin/dashboard-open-for-doom)))
 
 (add-hook 'doom-init-ui-hook #'albin/use-dashboard-overrides-h)
 (add-hook 'emacs-startup-hook #'albin/use-dashboard-overrides-h)
