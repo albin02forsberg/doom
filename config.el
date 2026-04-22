@@ -36,7 +36,11 @@
 
 ;; This determines the style of line numbers in effect. If set to `nil', line
 ;; numbers are disabled. For relative line numbers, set this to `relative'.
-(setq display-line-numbers-type t)
+(setq display-line-numbers-type 'relative)
+
+;; Force line numbers on globally, with relative style.
+(setq-default display-line-numbers 'relative)
+(global-display-line-numbers-mode 1)
 
 ;; Enable current time for Doom modeline's `time` segment.
 (setq display-time-24hr-format t
@@ -121,6 +125,20 @@
 	   (file+headline org-default-notes-file "Notes")
 	   "* %?\n%U\n"))))
 
+;; GitHub Copilot setup
+(use-package! copilot
+  :hook (prog-mode . copilot-mode)
+  :config
+  (map! :map copilot-completion-map
+	  "<tab>" #'copilot-accept-completion
+	  "TAB" #'copilot-accept-completion
+	  "C-<tab>" #'copilot-accept-completion-by-word)
+  (map! :leader
+	  (:prefix ("t c" . "copilot")
+	   :desc "Toggle Copilot" "t" #'copilot-mode
+	   :desc "Login" "l" #'copilot-login
+	   :desc "Panel" "p" #'copilot-panel-complete)))
+
 ;; Force .tsx to web-mode to avoid tree-sitter grammar issues.
 (add-to-list 'auto-mode-alist '("\\.tsx\\'" . web-mode))
 
@@ -145,6 +163,197 @@
 		  tsx-ts-mode js-mode js-ts-mode js2-mode rjsx-mode web-mode)
 		 . ("typescript-language-server" "--stdio")))
   )
+
+;; -----------------------------
+;; Phase 2: workflow upgrades
+;; -----------------------------
+
+;; Better structure for org-roam notes.
+(after! org-roam
+	(setq org-roam-capture-templates
+				'(("p" "project" plain
+					 "* Goals\n%?\n\n* Tasks\n** TODO First task\n\n* Notes\n"
+					 :if-new (file+head "projects/%<%Y%m%d%H%M%S>-${slug}.org"
+															"#+title: ${title}\n#+filetags: :project:\n#+created: %U\n")
+					 :unnarrowed t)
+					("a" "area" plain
+					 "* Why this matters\n%?\n\n* Ongoing\n"
+					 :if-new (file+head "areas/%<%Y%m%d%H%M%S>-${slug}.org"
+															"#+title: ${title}\n#+filetags: :area:\n#+created: %U\n")
+					 :unnarrowed t)
+					("i" "idea" plain
+					 "%?"
+					 :if-new (file+head "ideas/%<%Y%m%d%H%M%S>-${slug}.org"
+															"#+title: ${title}\n#+filetags: :idea:\n#+created: %U\n")
+					 :unnarrowed t)
+					("m" "meeting" plain
+					 "* Attendees\n- \n\n* Notes\n%?\n\n* Actions\n** TODO "
+					 :if-new (file+head "meetings/%<%Y%m%d%H%M%S>-${slug}.org"
+															"#+title: ${title}\n#+filetags: :meeting:\n#+created: %U\n")
+					 :unnarrowed t)))
+
+	(setq org-roam-dailies-capture-templates
+				'(("d" "default" entry
+					 "* %<%H:%M> %?"
+					 :if-new (file+head "daily/%<%Y-%m-%d>.org"
+															"#+title: %<%A, %d %B %Y>\n")))))
+
+;; Agenda grouping for a clean "today" command.
+(use-package! org-super-agenda
+	:after org-agenda
+	:config
+	(org-super-agenda-mode 1)
+	(setq org-agenda-custom-commands
+				'(("z" "Today"
+					 ((agenda ""
+										((org-agenda-span 1)
+										 (org-super-agenda-groups
+											'((:name "Overdue" :deadline past)
+												(:name "Due Today" :deadline today)
+												(:name "Important" :priority "A")
+												(:name "Next Actions" :todo "NEXT")
+												(:name "Inbox" :file-path "inbox")
+												(:discard (:anything t)))))))))))
+
+;; Coding quality-of-life defaults.
+(setq-default fill-column 100)
+(add-hook 'prog-mode-hook #'display-fill-column-indicator-mode)
+(add-hook 'prog-mode-hook #'hl-line-mode)
+(after! apheleia
+	(setq apheleia-log-only-errors t))
+(after! flycheck
+	(setq flycheck-display-errors-delay 0.2
+				flycheck-indication-mode 'right-fringe))
+
+;; Workspace persistence and bootstrap helpers.
+(after! persp-mode
+	(setq persp-auto-save-opt 1
+				persp-set-last-persp-for-new-frames t)
+	(add-hook 'kill-emacs-hook #'persp-state-save))
+
+(defun albin/workspaces-bootstrap ()
+	"Create a practical default workspace layout."
+	(interactive)
+	(+workspace-switch "main" t)
+	(+workspace/new "notes")
+	(+workspace/new "code")
+	(+workspace-switch "main" t)
+	(message "Workspaces ready: main, notes, code"))
+
+;; Maintenance helpers: Doom diagnostics and keybinding cheatsheet.
+(defun albin/doom-health-check ()
+	"Run Doom diagnostics in a compile buffer."
+	(interactive)
+	(let ((doom-bin (if (file-executable-p (expand-file-name "~/.config/emacs/bin/doom"))
+											(expand-file-name "~/.config/emacs/bin/doom")
+										"doom")))
+		(compile (format "%s doctor && %s profile"
+										 (shell-quote-argument doom-bin)
+										 (shell-quote-argument doom-bin)))))
+
+(defun albin/show-keymap-cheatsheet ()
+	"Show personal keybindings in one place."
+	(interactive)
+	(with-current-buffer (get-buffer-create "*Albin Keys*")
+		(let ((inhibit-read-only t))
+			(erase-buffer)
+			(insert "Albin Keymap Cheatsheet\n")
+			(insert "======================\n\n")
+			(insert "Notes / Roam (SPC n)\n")
+			(insert "  SPC n a  agenda       SPC n c  capture\n")
+			(insert "  SPC n d  daily today  SPC n f  find node\n")
+			(insert "  SPC n i  insert node  SPC n r  capture node\n")
+			(insert "  SPC n t  capture daily SPC n x random node\n\n")
+			(insert "Copilot (SPC t c)\n")
+			(insert "  SPC t c t  toggle   SPC t c l  login   SPC t c p  panel\n\n")
+			(insert "Dashboard\n")
+			(insert "  i in  o out  b break  r resume  p profile  g refresh  q quit\n\n")
+			(insert "Maintenance\n")
+			(insert "  SPC h D  Doom health check   SPC h K  this cheatsheet\n")
+			(special-mode)
+			(goto-char (point-min))))
+	(pop-to-buffer "*Albin Keys*"))
+
+;; Lightweight git backups for notes/timeclock repos.
+(defcustom albin/backup-interval-seconds 1800
+	"Automatic backup interval for notes and timeclock in seconds."
+	:type 'integer)
+
+(defvar albin/backup-timer nil
+	"Timer for automatic notes/timeclock backups.")
+
+(defun albin/git-root (dir)
+	"Return git root for DIR, or nil when DIR is not inside a git repository."
+	(let ((default-directory (expand-file-name dir)))
+		(condition-case nil
+				(car (process-lines "git" "rev-parse" "--show-toplevel"))
+			(error nil))))
+
+(defun albin/git-backup-path (path label)
+	"Commit PATH changes to its git repo with LABEL.
+Returns non-nil if a commit was made."
+	(let* ((full-path (expand-file-name path))
+				 (repo (albin/git-root full-path)))
+		(when repo
+			(let* ((default-directory repo)
+						 (rel (file-relative-name full-path repo))
+						 (stamp (format-time-string "%Y-%m-%d %H:%M"))
+						 (changed nil))
+				(with-temp-buffer
+					(call-process "git" nil (current-buffer) nil "status" "--porcelain" "--" rel)
+					(setq changed (> (buffer-size) 0)))
+				(when changed
+					(call-process "git" nil nil nil "add" "--" rel)
+					(when (eq 0 (call-process "git" nil nil nil "commit" "-m" (format "backup(%s): %s" label stamp)))
+						t))))))
+
+(defun albin/backup-notes-and-timeclock ()
+	"Commit local note/timeclock changes when their repos are dirty."
+	(interactive)
+	(let ((notes-done (albin/git-backup-path org-directory "org"))
+				(time-done (and (boundp 'albin-timeclock-data-directory)
+												albin-timeclock-data-directory
+												(albin/git-backup-path albin-timeclock-data-directory "timeclock"))))
+		(message "Backup complete: notes=%s timeclock=%s"
+						 (if notes-done "committed" "clean/no-repo")
+						 (if time-done "committed" "clean/no-repo"))))
+
+(defun albin/start-backup-timer ()
+	"Start automatic notes/timeclock backup timer."
+	(interactive)
+	(when albin/backup-timer
+		(cancel-timer albin/backup-timer))
+	(setq albin/backup-timer
+				(run-at-time 120 albin/backup-interval-seconds #'albin/backup-notes-and-timeclock))
+	(message "Backup timer started (%ss interval)" albin/backup-interval-seconds))
+
+(defun albin/stop-backup-timer ()
+	"Stop automatic notes/timeclock backup timer."
+	(interactive)
+	(when albin/backup-timer
+		(cancel-timer albin/backup-timer)
+		(setq albin/backup-timer nil))
+	(message "Backup timer stopped"))
+
+(albin/start-backup-timer)
+
+;; Custom keybindings for workflow helpers.
+(map! :leader
+			:desc "Doom health check" "h D" #'albin/doom-health-check
+			:desc "My key cheatsheet" "h K" #'albin/show-keymap-cheatsheet)
+
+(map! :leader
+			(:prefix ("w" . "workspace")
+			 :desc "Bootstrap workspaces" "B" #'albin/workspaces-bootstrap
+			 :desc "Save workspace state" "S" #'persp-state-save
+			 :desc "Load workspace state" "L" #'persp-state-load))
+
+(map! :leader
+			(:prefix ("n b" . "backup")
+			 :desc "Backup now" "b" #'albin/backup-notes-and-timeclock
+			 :desc "Start backup timer" "s" #'albin/start-backup-timer
+			 :desc "Stop backup timer" "x" #'albin/stop-backup-timer))
+
 
 
 ;; Whenever you reconfigure a package, make sure to wrap your config in an

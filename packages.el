@@ -55,3 +55,5 @@
 
 (package! nerd-icons)
 (package! org-roam)
+(package! copilot)
+(package! org-super-agenda)

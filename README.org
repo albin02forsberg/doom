@@ -1,1 +1,131 @@
-#+title: README
+#+title: Doom Config
+
+* Overview
+
+This Doom setup is built around a roam-first notes flow, a custom dashboard,
+time tracking, and practical coding defaults.
+
+Main pillars:
+
+- Org-roam as the center for notes, agenda, and daily planning
+- Custom dashboard with status widgets, quick actions, and reports
+- Timeclock + diary + automatic backup helpers
+- Copilot + Eglot for coding
+- Workspace persistence and quick bootstrap commands
+
+* First Run
+
+1. Sync packages:
+
+#+begin_src bash
+~/.config/emacs/bin/doom sync
+#+end_src
+
+2. Restart Emacs.
+
+3. Login to Copilot once:
+
+#+begin_example
+M-x copilot-login
+#+end_example
+
+* Notes and Org-Roam
+
+Root:
+
+- Org directory: =~/org/= (also used as =org-roam-directory=)
+
+Capture and navigation live under =SPC n=:
+
+- =SPC n a=: agenda
+- =SPC n c=: capture
+- =SPC n d=: today daily
+- =SPC n f=: find node
+- =SPC n i=: insert node
+- =SPC n r=: capture node
+- =SPC n t=: capture today daily
+- =SPC n x=: random node
+
+Org-roam templates include:
+
+- project
+- area
+- idea
+- meeting
+- daily
+
+* Agenda
+
+=org-super-agenda= is enabled with a custom =Today= view:
+
+- =M-x org-agenda= then select command key =z=
+
+Groups include overdue, due today, priority A, next actions, and inbox items.
+
+* Dashboard
+
+Dashboard opens on startup and includes:
+
+- session stats
+- org/roam status
+- timeclock/flex widgets
+- today focus
+- quick file jump buttons
+
+Dashboard keys:
+
+- =i= in, =o= out, =b= break, =r= resume
+- =g= refresh
+- =q= close
+
+* Workspaces
+
+Persistence is enabled with automatic save on exit.
+
+Workspace helpers:
+
+- =SPC w B=: bootstrap default workspaces (main, notes, code)
+- =SPC w S=: save state
+- =SPC w L=: load state
+
+* Coding Defaults
+
+- Relative line numbers are globally enabled
+- Fill column indicator enabled in programming buffers
+- Highlight current line in programming buffers
+- Flycheck error display delay tuned for responsiveness
+- Apheleia logs only errors
+- Eglot auto-starts in programming buffers (including TSX via web-mode)
+
+* Copilot
+
+- Auto-enabled in programming buffers
+- Completion keys: =TAB=, =<tab>=, =C-<tab>= (by word)
+
+Copilot command group:
+
+- =SPC t c t=: toggle
+- =SPC t c l=: login
+- =SPC t c p=: panel
+
+* Backup Automation
+
+Automatic backup timer is enabled at startup.
+
+It commits local changes for:
+
+- =org-directory=
+- =albin-timeclock-data-directory=
+
+...when those directories are inside git repositories.
+
+Backup commands:
+
+- =SPC n b b=: backup now
+- =SPC n b s=: start timer
+- =SPC n b x=: stop timer
+
+* Maintenance
+
+- =SPC h D=: run Doom health check (=doom doctor && doom profile=)
+- =SPC h K=: open personal keybinding cheatsheet
